@@ -4,6 +4,7 @@ namespace frontend\controllers;
 
 use common\models\UserCharts;
 use common\models\ChartData;
+use common\models\ChartGroups;
 use yii\web\Response;
 use yii\widgets\ActiveForm;
 use yii\helpers\ArrayHelper;
@@ -57,30 +58,45 @@ class UserChartsController extends \yii\web\Controller {
     }
 
     public function actionCreate() {
-        $modelChart = new UserCharts;
-        $modelChartData = [new ChartData()];
+        $modelGroup = new ChartGroups;
+        $modelChart = [new UserCharts];
+        $modelChartData = [[new ChartData()]];
 
-        if ($modelChart->load(Yii::$app->request->post())) {
+        if ($modelGroup->load(Yii::$app->request->post())) {
             //chart-url create
-            $modelChart->created_at = time();
+            $modelGroup->created_at = time();
             $urlLength = rand(6, 12);
-            $modelChart->user_id = Yii::$app->user->id;
-            $modelChart->url = Yii::$app->getSecurity()->generateRandomString($urlLength);
+            $modelGroup->user_id = Yii::$app->user->id;
+            $modelGroup->url = Yii::$app->getSecurity()->generateRandomString($urlLength);
             
-            $modelChartData = MultipleForm::createMultiple(ChartData::className());
-            MultipleForm::loadMultiple($modelChartData, Yii::$app->request->post());
+            $modelChart = MultipleForm::createMultiple(UserCharts::className());
+            MultipleForm::loadMultiple($modelChart, Yii::$app->request->post());
 
             // ajax validation
-            if (Yii::$app->request->isAjax) {
+            /*if (Yii::$app->request->isAjax) {
                 Yii::$app->response->format = Response::FORMAT_JSON;
                 return ArrayHelper::merge(
                     ActiveForm::validateMultiple($modelChartData),
                     ActiveForm::validate($modelChart)
                 );
-            }
+            }*/
+            
             // validate all models            
-            $valid = $modelChart->validate();
-            $valid = MultipleForm::validateMultiple($modelChartData) && $valid;
+            $valid = $modelGroup->validate();
+            $valid = MultipleForm::validateMultiple($modelChart) && $valid;
+            
+            if (isset($_POST['chartData'][0][0]) && $valid) {
+                foreach ($_POST['chartData'] as $indexChart => $chartDatas) {
+                    foreach ($chartDatas as $indexData => $chartData) {
+                        $chartData['chartData'] = $chartData;
+                        $modelChartData = new ChartData;
+                        $modelChartData->load($chartData);
+                        $modelChartData[$indexChart][$indexData] = $modelChartData;
+                        $valid = $modelChartData->validate();
+                    }
+                }
+            }
+            
             if ($valid) {
                 $transaction = \Yii::$app->db->beginTransaction();
                 try {
